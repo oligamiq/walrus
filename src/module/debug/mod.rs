@@ -14,7 +14,9 @@ use self::units::DebuggingInformationCursor;
 #[derive(Debug, Default)]
 pub struct ModuleDebugData {
     /// DWARF debug data
-    pub dwarf: read::Dwarf<Vec<u8>>,
+    pub dwarf: read::DwarfSections<Vec<u8>>,
+    /// https://github.com/gimli-rs/gimli/pull/801
+    pub dwarf_sup_sections: read::DwarfSections<Vec<u8>>,
 }
 
 impl Module {
@@ -34,7 +36,11 @@ impl Module {
             )
         };
 
-        self.debug.dwarf = read::Dwarf::load(load_section)?;
+        // supplementary sections
+        let load_sup_section = |_: gimli::SectionId| -> Result<Vec<u8>> { Ok(Vec::new()) };
+
+        self.debug.dwarf = read::DwarfSections::load(load_section)?;
+        self.debug.dwarf_sup_sections = read::DwarfSections::load(load_sup_section)?;
 
         Ok(())
     }
@@ -59,7 +65,9 @@ impl Emit for ModuleDebugData {
             .module
             .debug
             .dwarf
-            .borrow(|sections| EndianSlice::new(sections.as_ref(), LittleEndian));
+            .borrow_with_sup(&cx.module.debug.dwarf_sup_sections, |sections| {
+                EndianSlice::new(sections.as_ref(), LittleEndian)
+            });
 
         let mut dwarf = write::Dwarf::from(&from_dwarf, &|address| {
             if address == 0 || address == DEAD_CODE {

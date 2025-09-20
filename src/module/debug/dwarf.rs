@@ -117,7 +117,7 @@ where
         let from_header = from_program.header();
         let encoding = from_header.encoding();
 
-        let comp_dir = match from_header.directory(0) {
+        let working_dir = match from_header.directory(0) {
             Some(comp_dir) => self.convert_line_string(comp_dir)?,
             None => write::LineString::new(&[][..], encoding, self.line_strings),
         };
@@ -133,6 +133,8 @@ where
                         timestamp: comp_file.timestamp(),
                         size: comp_file.size(),
                         md5: *comp_file.md5(),
+                        // todo!();
+                        source: None,
                     }),
                 )
             }
@@ -148,7 +150,8 @@ where
         let mut program = write::LineProgram::new(
             encoding,
             from_header.line_encoding(),
-            comp_dir,
+            working_dir,
+            None,
             comp_name,
             comp_file_info,
         );
@@ -182,6 +185,8 @@ where
                 timestamp: from_file.timestamp(),
                 size: from_file.size(),
                 md5: *from_file.md5(),
+                // todo!();
+                source: None,
             });
             files.push(program.add_file(from_name, from_dir, from_info));
         }
@@ -216,13 +221,13 @@ where
                     }
                     from_base_address = val;
 
-                    from_row.execute(read::LineInstruction::SetAddress(0), &mut from_program);
+                    from_row.execute(read::LineInstruction::SetAddress(0), &mut from_program)?;
                 }
                 read::LineInstruction::DefineFile(_) => {
                     return Err(write::ConvertError::UnsupportedLineInstruction);
                 }
                 _ => {
-                    if from_row.execute(instruction, &mut from_program) {
+                    if from_row.execute(instruction, &mut from_program)? {
                         if !program.in_sequence() {
                             // begin new sequence if exists
                             current_sequence_base_address = (self.convert_address)(
@@ -346,6 +351,7 @@ mod tests {
                 default_is_stmt: true,
             },
             write::LineString::String(dir1.to_vec()),
+            None,
             comp_file.clone(),
             None,
         );
